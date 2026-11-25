@@ -70,7 +70,7 @@ const EMPTY_BLOG = {
 export default function AdminPage({ onExitAdmin, onDataMutated }) {
   const [admin, setAdmin] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [loginForm, setLoginForm] = useState({ email: 'admin@xraptor.vn', password: '' });
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
 
@@ -221,7 +221,7 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
       const res = await api.updateOrderStatus(orderId, status);
       setOrders((prev) => prev.map((o) => (o.id === orderId ? res.order : o)));
       if (orderDetail?.id === orderId) setOrderDetail(res.order);
-      api.getDashboard().then(setDashboard).catch(() => {});
+      api.getDashboard().then(setDashboard).catch(() => { });
       showNotice(`Đã chuyển trạng thái đơn hàng thành "${status}".`);
     } catch (err) {
       showNotice(err.message, 'error');
@@ -246,7 +246,7 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
     try {
       const res = await api.updateContactStatus(c.id, next);
       setContacts((prev) => prev.map((item) => (item.id === c.id ? res.contact : item)));
-      api.getDashboard().then(setDashboard).catch(() => {});
+      api.getDashboard().then(setDashboard).catch(() => { });
       showNotice(`Đã đánh dấu liên hệ: ${next}`);
     } catch (err) {
       showNotice(err.message, 'error');
@@ -385,16 +385,6 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
             </button>
           </form>
 
-          <div className="bg-[#edf8ff] rounded-lg p-3.5 text-xs text-[#134377] space-y-1">
-            <p className="font-bold">Tài khoản mặc định:</p>
-            <p>
-              Email: <code className="font-mono bg-white px-1.5 py-0.5 rounded">admin@xraptor.vn</code>
-            </p>
-            <p>
-              Mật khẩu: <code className="font-mono bg-white px-1.5 py-0.5 rounded">admin123</code>
-            </p>
-          </div>
-
           <button
             onClick={onExitAdmin}
             className="w-full text-center text-sm text-gray-500 hover:text-[#0972b6] font-medium cursor-pointer"
@@ -463,9 +453,8 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-[260px] bg-[#134377] text-white flex flex-col transition-transform duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-[260px] bg-[#134377] text-white flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          }`}
       >
         <div className="px-5 h-[72px] flex items-center justify-between border-b border-white/10">
           <div className="flex items-center gap-3">
@@ -498,11 +487,10 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                   setTab(item.id);
                   setSidebarOpen(false);
                 }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                  active
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${active
                     ? 'bg-[#0972b6] text-white shadow-sm'
                     : 'text-white/80 hover:bg-white/10 hover:text-white'
-                }`}
+                  }`}
               >
                 <span className="flex items-center gap-3">
                   <Icon className="w-4 h-4 shrink-0" />
@@ -510,11 +498,10 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                 </span>
                 {item.badge > 0 && (
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                      item.highlight
+                    className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${item.highlight
                         ? 'bg-[#f5dc4a] text-black'
                         : 'bg-white/15 text-white'
-                    }`}
+                      }`}
                   >
                     {item.badge}
                   </span>
@@ -562,16 +549,14 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
             </h1>
             {dashboard?.database && (
               <span
-                className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
-                  dashboard.database === 'supabase'
+                className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${dashboard.database === 'supabase'
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : 'bg-amber-50 text-amber-700 border-amber-200'
-                }`}
+                  }`}
               >
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    dashboard.database === 'supabase' ? 'bg-emerald-500' : 'bg-amber-500'
-                  }`}
+                  className={`w-1.5 h-1.5 rounded-full ${dashboard.database === 'supabase' ? 'bg-emerald-500' : 'bg-amber-500'
+                    }`}
                 />
                 {dashboard.database === 'supabase' ? 'Supabase PostgreSQL' : 'Local SQLite'}
               </span>
@@ -750,9 +735,8 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                           </td>
                           <td className="px-5 py-3">
                             <span
-                              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                                STATUS_BADGE[o.status] || 'bg-gray-100'
-                              }`}
+                              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${STATUS_BADGE[o.status] || 'bg-gray-100'
+                                }`}
                             >
                               {o.status}
                             </span>
@@ -852,11 +836,10 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                           </td>
                           <td className="px-4 py-3">
                             <span
-                              className={`font-bold text-xs px-2 py-0.5 rounded ${
-                                p.stock <= 10
+                              className={`font-bold text-xs px-2 py-0.5 rounded ${p.stock <= 10
                                   ? 'bg-rose-50 text-rose-700'
                                   : 'bg-emerald-50 text-emerald-700'
-                              }`}
+                                }`}
                             >
                               {p.stock}
                             </span>
@@ -907,11 +890,10 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                     <button
                       key={st}
                       onClick={() => setOrderStatusFilter(st)}
-                      className={`px-3 h-9 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                        orderStatusFilter === st
+                      className={`px-3 h-9 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${orderStatusFilter === st
                           ? 'bg-[#134377] text-white'
                           : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
+                        }`}
                     >
                       {st}
                     </button>
@@ -951,9 +933,8 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                             <select
                               value={o.status}
                               onChange={(e) => handleOrderStatus(o.id, e.target.value)}
-                              className={`text-xs font-bold px-2.5 py-1 rounded-full border outline-none cursor-pointer ${
-                                STATUS_BADGE[o.status] || 'bg-gray-100'
-                              }`}
+                              className={`text-xs font-bold px-2.5 py-1 rounded-full border outline-none cursor-pointer ${STATUS_BADGE[o.status] || 'bg-gray-100'
+                                }`}
                             >
                               {ORDER_STATUSES.map((st) => (
                                 <option key={st} value={st} className="bg-white text-black">
@@ -999,9 +980,8 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-bold text-base text-[#134377]">{c.subject}</span>
                       <span
-                        className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                          STATUS_BADGE[c.status]
-                        }`}
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${STATUS_BADGE[c.status]
+                          }`}
                       >
                         {c.status}
                       </span>
@@ -1691,9 +1671,8 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
       {/* Toast Notice */}
       {notice && (
         <div
-          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-lg shadow-xl text-white text-sm font-medium animate-xr-toast ${
-            notice.type === 'error' ? 'bg-rose-600' : 'bg-[#134377] border-l-4 border-[#f5dc4a]'
-          }`}
+          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-lg shadow-xl text-white text-sm font-medium animate-xr-toast ${notice.type === 'error' ? 'bg-rose-600' : 'bg-[#134377] border-l-4 border-[#f5dc4a]'
+            }`}
         >
           {notice.text}
         </div>
