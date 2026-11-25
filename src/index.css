@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --xr-navy: #134377;
+    --xr-teal: #2a879e;
+    --xr-blue: #0972b6;
+    --xr-yellow: #f5dc4a;
+    --xr-sky: #edf8ff;
+    --xr-red: #dd3333;
+    --xr-gray: #f6f6f6;
+    --xr-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Be Vietnam Pro', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #27272a;
+    background-color: #ffffff;
+    overflow-x: hidden;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+.font-heading {
+  font-family: 'Goldman', 'Be Vietnam Pro', sans-serif;
+}
+
+.font-roboto {
+  font-family: 'Roboto', 'Be Vietnam Pro', sans-serif;
+}
+
+/* Custom container matching Figma 1440px canvas with 122px side padding (1196px content width) */
+.xr-container {
+  max-width: 1196px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+@media (min-width: 1280px) {
+  .xr-container {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* Defer layout/paint of off-screen sections for 60/120fps scrolling */
+.xr-section-cv {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 620px;
+}
+
+/* Smooth GPU-composited micro-animations */
+@keyframes xrFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes xrSlideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes xrBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes xrToastPop {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-xr-fade {
+  animation: xrFadeIn 0.35s var(--xr-ease) both;
+}
+
+.animate-xr-drawer {
+  animation: xrSlideInRight 0.32s var(--xr-ease) both;
+}
+
+.animate-xr-backdrop {
+  animation: xrBackdropIn 0.22s ease-out both;
+}
+
+.animate-xr-toast {
+  animation: xrToastPop 0.28s var(--xr-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-xr-fade,
+  .animate-xr-drawer,
+  .animate-xr-backdrop,
+  .animate-xr-toast {
+    animation: none !important;
+  }
+}
