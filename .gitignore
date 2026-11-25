@@ -34,3 +34,10 @@ Thumbs.db
 
 # Large Figma raw binaries (assets extracted to public/images)
 *.fig
+
+# Local SQLite database & user uploads
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+public/uploads/*
+!public/uploads/.gitkeep

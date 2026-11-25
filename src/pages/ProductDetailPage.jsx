@@ -17,12 +17,13 @@ import ProductCard from '../components/ProductCard';
 
 export default function ProductDetailPage({
   product,
+  products = [],
   onNavigate,
   onSelectProduct,
   onAddToCart,
   onOpenCart,
 }) {
-  const current = product || FEATURED_PADDLES[1];
+  const current = product || products[1] || FEATURED_PADDLES[1];
   const gallery = current.gallery?.length
     ? current.gallery
     : [
@@ -44,7 +45,22 @@ export default function ProductDetailPage({
     setExpanded(false);
   }, [current.id]);
 
-  const similarProducts = FEATURED_PADDLES.slice(4, 8);
+  const similarProducts = products.length
+    ? products.filter((p) => p.category === current.category && p.id !== current.id).slice(0, 4)
+    : FEATURED_PADDLES.slice(4, 8);
+  const specLines = current.specs
+    ? current.specs.split('\n').filter(Boolean)
+    : [
+        'Kích thước: 19cm x 42cm',
+        'Độ dày mặt vợt: 16mm',
+        'Chiều dài tay cầm: 14cm',
+        'Chu vi tay cầm: 11cm',
+        'Trọng lượng: 225-235g',
+        'Bảo hành 3 tháng, 1 đổi 1',
+        'Hàng chính hãng có VAT',
+        'Mặt vợt: Multidirectional T700 Raw Carbon',
+        'Lõi vợt: ElasticPP Honeycomb',
+      ];
 
   return (
     <div className="bg-white">
@@ -146,15 +162,9 @@ export default function ProductDetailPage({
 
             {/* Specifications List matching Figma 109:1215 */}
             <ul className="py-5 space-y-1.5 text-[15.5px] text-black font-light leading-relaxed">
-              <li>Kích thước: 19cm x 42cm</li>
-              <li>Độ dày mặt vợt: 16mm</li>
-              <li>Chiều dài tay cầm: 14cm</li>
-              <li>Chu vi tay cầm: 11cm</li>
-              <li>Trọng lượng: 225-235g</li>
-              <li>Bảo hành 3 tháng, 1 đổi 1</li>
-              <li>Hàng chính hãng có VAT</li>
-              <li>Mặt vợt: Multidirectional T700 Raw Carbon</li>
-              <li>Lõi vợt: ElasticPP Honeycomb</li>
+              {specLines.map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
             </ul>
 
             {/* Quantity Selector */}
@@ -177,7 +187,9 @@ export default function ProductDetailPage({
                   +
                 </button>
               </div>
-              <span className="text-[15px] text-[#454645]">(200 sản phẩm có sẵn)</span>
+              <span className="text-[15px] text-[#454645]">
+                ({current.stock ?? 200} sản phẩm có sẵn)
+              </span>
             </div>
 
             {/* 2 CTA Buttons: Black "Thêm vào giỏ hàng" + Blue "Mua ngay" */}

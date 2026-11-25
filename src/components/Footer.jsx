@@ -2,7 +2,7 @@ import React from 'react';
 import { ShieldCheck, Headphones, Truck } from 'lucide-react';
 import { BRAND } from '../data/siteData';
 
-export default function Footer({ onNavigate }) {
+export default function Footer({ onNavigate, onOpenTrack, onOpenAdmin }) {
   return (
     <footer className="bg-white text-[#134377] pt-8">
       <div className="xr-container">
@@ -144,7 +144,10 @@ export default function Footer({ onNavigate }) {
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('contact')} className="hover:text-[#0972b6] cursor-pointer">
+                <button
+                  onClick={() => (onOpenTrack ? onOpenTrack() : onNavigate('contact'))}
+                  className="hover:text-[#0972b6] cursor-pointer"
+                >
                   Kiểm tra đơn hàng
                 </button>
               </li>
@@ -216,8 +219,18 @@ export default function Footer({ onNavigate }) {
       </div>
 
       {/* Bottom Copyright Bar */}
-      <div className="bg-[#134377] text-white py-3.5 text-center text-[14px]">
-        © 2025 Copyright by All rights reserved. Designed by Vicogroup.vn
+      <div className="bg-[#134377] text-white py-3.5 text-[14px]">
+        <div className="xr-container flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>© 2025 Copyright by All rights reserved. Designed by Vicogroup.vn</span>
+          {onOpenAdmin && (
+            <button
+              onClick={onOpenAdmin}
+              className="text-white/75 hover:text-[#f5dc4a] text-xs font-medium transition-colors cursor-pointer"
+            >
+              Trang quản trị (Admin)
+            </button>
+          )}
+        </div>
       </div>
     </footer>
   );

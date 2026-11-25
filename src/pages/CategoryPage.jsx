@@ -10,12 +10,14 @@ import {
 import ProductCard from '../components/ProductCard';
 
 export default function CategoryPage({
+  products = [],
   initialFilter,
   searchQuery,
   onNavigate,
   onSelectProduct,
   onAddToCart,
 }) {
+  const catalog = products.length ? products : ALL_PRODUCTS;
   const [selectedFilters, setSelectedFilters] = useState(
     initialFilter ? [initialFilter] : []
   );
@@ -41,8 +43,8 @@ export default function CategoryPage({
   const filteredProducts = useMemo(() => {
     let base =
       selectedFilters.length === 0 && !searchQuery.trim()
-        ? CATEGORY_PAGE_PRODUCTS
-        : ALL_PRODUCTS;
+        ? (products.length ? products.filter((p) => p.category !== 'Vợt Pickleball').slice(0, 12) : CATEGORY_PAGE_PRODUCTS)
+        : catalog;
 
     if (selectedFilters.length > 0) {
       base = base.filter(
@@ -66,7 +68,7 @@ export default function CategoryPage({
     else if (sortBy === 'price-desc') list.sort((a, b) => b.price - a.price);
     else if (sortBy === 'name-asc') list.sort((a, b) => a.name.localeCompare(b.name));
     return list;
-  }, [selectedFilters, sortBy, searchQuery]);
+  }, [selectedFilters, sortBy, searchQuery, products, catalog]);
 
   const pageTitle =
     selectedFilters.length === 1

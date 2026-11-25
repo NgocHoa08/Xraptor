@@ -1,17 +1,29 @@
 import React, { useState } from 'react';
 import { Mail, CheckCircle2 } from 'lucide-react';
 import { BRAND } from '../data/siteData';
+import { api } from '../services/api';
 
 export default function Newsletter() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim()) return;
-    setSubmitted(true);
-    setEmail('');
-    setTimeout(() => setSubmitted(false), 4000);
+    setLoading(true);
+    setError('');
+    try {
+      await api.subscribe(email.trim());
+      setSubmitted(true);
+      setEmail('');
+      setTimeout(() => setSubmitted(false), 4000);
+    } catch (err) {
+      setError(err.message || 'Không thể đăng ký lúc này.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -39,9 +51,10 @@ export default function Newsletter() {
               </div>
               <button
                 type="submit"
-                className="h-[50px] px-8 rounded-[5px] bg-[#0972b6] hover:bg-[#134377] text-white font-semibold text-[16px] transition-colors cursor-pointer shrink-0"
+                disabled={loading}
+                className="h-[50px] px-8 rounded-[5px] bg-[#0972b6] hover:bg-[#134377] disabled:opacity-60 text-white font-semibold text-[16px] transition-colors cursor-pointer shrink-0"
               >
-                Đăng ký
+                {loading ? 'Đang gửi...' : 'Đăng ký'}
               </button>
             </form>
             {submitted && (
@@ -50,6 +63,7 @@ export default function Newsletter() {
                 Đăng ký nhận thông báo thành công!
               </p>
             )}
+            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
           </div>
         </div>
 
@@ -58,6 +72,8 @@ export default function Newsletter() {
           <img
             src={BRAND.newsletterBanner}
             alt="Xraptor Pickleball Community"
+            decoding="async"
+            loading="lazy"
             className="w-full h-full object-cover"
           />
         </div>

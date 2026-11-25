@@ -102,11 +102,31 @@ function AccessorySubSection({
   );
 }
 
-export default function HomePage({ onNavigate, onSelectProduct, onAddToCart }) {
+export default function HomePage({
+  products = [],
+  blogs = [],
+  onNavigate,
+  onSelectProduct,
+  onAddToCart,
+}) {
   const [heroIdx, setHeroIdx] = useState(0);
   const [heroPaused, setHeroPaused] = useState(false);
   const [testiIdx, setTestiIdx] = useState(0);
   const [activeVideo, setActiveVideo] = useState(null);
+
+  const featuredPaddles = products.length
+    ? products.filter((p) => p.featured || p.category === 'Vợt Pickleball').slice(0, 8)
+    : FEATURED_PADDLES;
+  const ballList = products.length
+    ? products.filter((p) => p.category === 'Bóng Pickleball').slice(0, 6)
+    : BALL_PRODUCTS;
+  const shoeList = products.length
+    ? products.filter((p) => p.category === 'Giày Pickleball').slice(0, 6)
+    : SHOE_PRODUCTS;
+  const netList = products.length
+    ? products.filter((p) => p.category === 'Lưới Pickleball').slice(0, 6)
+    : NET_PRODUCTS;
+  const blogList = blogs.length ? blogs.slice(0, 3) : BLOG_POSTS;
 
   // Smooth auto-play hero slider (pauses on hover)
   useEffect(() => {
@@ -266,7 +286,7 @@ export default function HomePage({ onNavigate, onSelectProduct, onAddToCart }) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {FEATURED_PADDLES.map((product) => (
+            {featuredPaddles.map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -373,7 +393,7 @@ export default function HomePage({ onNavigate, onSelectProduct, onAddToCart }) {
           <AccessorySubSection
             title="Bóng pickleball"
             promoImage={BALL_PROMO}
-            products={BALL_PRODUCTS}
+            products={ballList}
             filterKey="Bóng Pickleball"
             borderColor="#2a879e"
             onNavigate={onNavigate}
@@ -384,7 +404,7 @@ export default function HomePage({ onNavigate, onSelectProduct, onAddToCart }) {
           <AccessorySubSection
             title="Giày pickleball"
             promoImage={SHOE_PROMO}
-            products={SHOE_PRODUCTS}
+            products={shoeList}
             filterKey="Giày Pickleball"
             borderColor="#134377"
             onNavigate={onNavigate}
@@ -395,7 +415,7 @@ export default function HomePage({ onNavigate, onSelectProduct, onAddToCart }) {
           <AccessorySubSection
             title="Lưới pickleball chất lượng cao"
             promoImage={NET_PROMO}
-            products={NET_PRODUCTS}
+            products={netList}
             filterKey="Lưới Pickleball"
             borderColor="#134377"
             onNavigate={onNavigate}
@@ -513,7 +533,7 @@ export default function HomePage({ onNavigate, onSelectProduct, onAddToCart }) {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-7 mb-10">
-            {BLOG_POSTS.map((post) => (
+            {blogList.map((post) => (
               <article
                 key={post.id}
                 className="group cursor-pointer"

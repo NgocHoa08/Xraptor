@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { BRAND } from '../data/siteData';
+import { api } from '../services/api';
 
 export default function ContactPage({ onNavigate }) {
   const [form, setForm] = useState({
@@ -12,19 +13,30 @@ export default function ContactPage({ onNavigate }) {
     message: '',
   });
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSent(true);
-    setForm({
-      fullName: '',
-      phone: '',
-      email: '',
-      orderCode: '',
-      subject: '',
-      message: '',
-    });
-    setTimeout(() => setSent(false), 5000);
+    setSending(true);
+    setError('');
+    try {
+      await api.createContact(form);
+      setSent(true);
+      setForm({
+        fullName: '',
+        phone: '',
+        email: '',
+        orderCode: '',
+        subject: '',
+        message: '',
+      });
+      setTimeout(() => setSent(false), 5000);
+    } catch (err) {
+      setError(err.message || 'Không thể gửi liên hệ lúc này.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -199,12 +211,14 @@ export default function ContactPage({ onNavigate }) {
                     Đã gửi liên hệ thành công! Chúng tôi sẽ phản hồi sớm nhất.
                   </p>
                 )}
+                {error && <p className="text-sm font-medium text-red-600">{error}</p>}
               </div>
               <button
                 type="submit"
-                className="h-[46px] px-8 rounded-[5px] bg-[#0972b6] hover:bg-[#134377] text-white font-bold text-[15px] uppercase transition-colors cursor-pointer"
+                disabled={sending}
+                className="h-[46px] px-8 rounded-[5px] bg-[#0972b6] hover:bg-[#134377] disabled:opacity-60 text-white font-bold text-[15px] uppercase transition-colors cursor-pointer"
               >
-                Gửi ngay
+                {sending ? 'Đang gửi...' : 'Gửi ngay'}
               </button>
             </div>
           </form>

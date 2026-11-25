@@ -4,13 +4,16 @@ import Header from './components/Header';
 import Newsletter from './components/Newsletter';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
-import { FEATURED_PADDLES } from './data/siteData';
+import { ALL_PRODUCTS, BLOG_POSTS, FEATURED_PADDLES } from './data/siteData';
+import { api } from './services/api';
 
-// Lazy-load secondary pages & drawer for smaller initial JS bundle
+// Lazy-load secondary pages, admin portal & modals
 const CategoryPage = lazy(() => import('./pages/CategoryPage'));
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 const CartDrawer = lazy(() => import('./components/CartDrawer'));
+const OrderTrackingModal = lazy(() => import('./components/OrderTrackingModal'));
 
 function PageLoader() {
   return (
@@ -20,15 +23,54 @@ function PageLoader() {
   );
 }
 
+function getInitialPage() {
+  if (window.location.pathname.startsWith('/admin') || window.location.hash === '#/admin') {
+    return 'admin';
+  }
+  return 'home';
+}
+
 export default function App() {
-  const [activePage, setActivePage] = useState('home');
+  const [activePage, setActivePage] = useState(getInitialPage);
   const [categoryFilter, setCategoryFilter] = useState(null);
+  const [products, setProducts] = useState(ALL_PRODUCTS);
+  const [blogs, setBlogs] = useState(BLOG_POSTS);
   const [selectedProduct, setSelectedProduct] = useState(FEATURED_PADDLES[1]);
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
+  const [trackOpen, setTrackOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [showBackTop, setShowBackTop] = useState(false);
+
+  const loadStoreData = useCallback(async () => {
+    try {
+      const [prodRes, blogRes] = await Promise.all([api.getProducts(), api.getBlogs()]);
+      if (prodRes.products?.length) {
+        setProducts(prodRes.products);
+        setSelectedProduct((prev) => prodRes.products.find((p) => p.id === prev?.id) || prodRes.products[0]);
+      }
+      if (blogRes.blogs?.length) {
+        setBlogs(blogRes.blogs);
+      }
+    } catch {
+      // Keep bundled fallback data seamlessly if API is offline
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStoreData();
+  }, [loadStoreData]);
+
+  // Support browser back/forward for /admin vs storefront
+  useEffect(() => {
+    const onPop = () => {
+      if (window.location.pathname.startsWith('/admin')) setActivePage('admin');
+      else setActivePage((prev) => (prev === 'admin' ? 'home' : prev));
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   useEffect(() => {
     let ticking = false;
@@ -47,11 +89,18 @@ export default function App() {
 
   const showToast = useCallback((msg) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 2600);
+    setTimeout(() => setToast(null), 2800);
   }, []);
 
   const handleNavigate = useCallback((page, opts = {}) => {
     setActivePage(page);
+    if (page === 'admin') {
+      if (!window.location.pathname.startsWith('/admin')) {
+        window.history.pushState({}, '', '/admin');
+      }
+    } else if (window.location.pathname.startsWith('/admin')) {
+      window.history.pushState({}, '', '/');
+    }
     if (page === 'category') {
       setCategoryFilter(opts.filterCategory || null);
     }
@@ -94,14 +143,29 @@ export default function App() {
     setCart((prev) => prev.filter((i) => i.product.id !== id));
   }, []);
 
-  const handleCheckout = useCallback(() => {
-    setCart([]);
-    setCartOpen(false);
-    showToast('Đặt hàng thành công! Xraptor sẽ liên hệ xác nhận sớm.');
-  }, [showToast]);
+  const handleOrderSuccess = useCallback(
+    (order) => {
+      setCart([]);
+      loadStoreData();
+      showToast(`Đặt hàng thành công! Mã đơn: ${order.order_code}`);
+    },
+    [loadStoreData, showToast]
+  );
 
   const handleOpenCart = useCallback(() => setCartOpen(true), []);
   const handleCloseCart = useCallback(() => setCartOpen(false), []);
+
+  // Dedicated full-screen Admin Portal
+  if (activePage === 'admin') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <AdminPage
+          onExitAdmin={() => handleNavigate('home')}
+          onDataMutated={loadStoreData}
+        />
+      </Suspense>
+    );
+  }
 
   const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
 
@@ -120,6 +184,8 @@ export default function App() {
         <Suspense fallback={<PageLoader />}>
           {activePage === 'home' && (
             <HomePage
+              products={products}
+              blogs={blogs}
               onNavigate={handleNavigate}
               onSelectProduct={handleSelectProduct}
               onAddToCart={handleAddToCart}
@@ -127,6 +193,7 @@ export default function App() {
           )}
           {activePage === 'category' && (
             <CategoryPage
+              products={products}
               initialFilter={categoryFilter}
               searchQuery={searchQuery}
               onNavigate={handleNavigate}
@@ -137,6 +204,7 @@ export default function App() {
           {activePage === 'product' && (
             <ProductDetailPage
               product={selectedProduct}
+              products={products}
               onNavigate={handleNavigate}
               onSelectProduct={handleSelectProduct}
               onAddToCart={handleAddToCart}
@@ -148,7 +216,11 @@ export default function App() {
       </main>
 
       <Newsletter />
-      <Footer onNavigate={handleNavigate} />
+      <Footer
+        onNavigate={handleNavigate}
+        onOpenTrack={() => setTrackOpen(true)}
+        onOpenAdmin={() => handleNavigate('admin')}
+      />
 
       {cartOpen && (
         <Suspense fallback={null}>
@@ -158,8 +230,14 @@ export default function App() {
             items={cart}
             onUpdateQty={handleUpdateQty}
             onRemove={handleRemoveItem}
-            onCheckout={handleCheckout}
+            onOrderSuccess={handleOrderSuccess}
           />
+        </Suspense>
+      )}
+
+      {trackOpen && (
+        <Suspense fallback={null}>
+          <OrderTrackingModal open={trackOpen} onClose={() => setTrackOpen(false)} />
         </Suspense>
       )}
 
