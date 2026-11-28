@@ -1,45 +1,55 @@
-# Xraptor - Full-Stack Website Pickleball (Storefront + Backend API + Admin Portal)
+# Xraptor - Full-Stack Website Pickleball (Clean Architecture + Thanh toán + Phân quyền RBAC)
 
-Website thương mại điện tử vợt & phụ kiện Pickleball **Xraptor** gồm đầy đủ **Frontend Storefront**, **Backend REST API (Express + SQLite)** và **Trang Quản trị Admin (`/admin`)**.
+Website thương mại điện tử vợt & phụ kiện Pickleball **Xraptor** gồm **Frontend Storefront (React + Vite + Tailwind CSS v4)**, **Backend REST API theo Clean Architecture (Node.js + Express 5 + SQLite/Supabase)**, **Hệ thống Thanh toán (COD / VietQR / VNPay + Sandbox)** và **Trang Quản trị Admin phân quyền RBAC (`/admin`)**.
 
-## Tech Stack
-- **Frontend**: React 19, Vite, Tailwind CSS v4, Lucide Icons
-- **Backend**: Node.js (Express 5 + SQLite `node:sqlite`, Multer upload ảnh, HMAC token auth)
-- **Triển khai**: Hỗ trợ chạy local (`npm run dev`) và deploy trực tiếp lên **Vercel** (`api/index.js` + `vercel.json`)
+## Kiến trúc Clean Architecture (Backend `server/`)
 
-## Tính năng chính
-### 1. Cửa hàng (Storefront)
-- **Trang chủ**: Hero slider, Vì sao chọn chúng tôi, Danh mục sản phẩm, Sản phẩm nổi bật, Về Xraptor, Phụ kiện Pickleball, Phản hồi khách hàng & Video review, Blog - Tin tức (tải động từ API).
-- **Phụ kiện & Danh mục**: Lọc theo dòng vợt/phụ kiện, tìm kiếm, sắp xếp giá/tên, phân trang.
-- **Chi tiết sản phẩm**: Gallery 6 ảnh, thông số kỹ thuật, tồn kho thực tế, thêm vào giỏ / mua ngay.
-- **Giỏ hàng & Đặt hàng**: Quy trình đặt hàng 2 bước (COD / Chuyển khoản), tự động trừ tồn kho và cấp mã đơn (`XR-XXXXXX`).
-- **Tra cứu đơn hàng**: Kiểm tra trạng thái đơn theo mã đơn hoặc số điện thoại.
-- **Liên hệ & Bản tin**: Gửi form liên hệ và đăng ký email trực tiếp về Backend.
+```text
+server/
+├── domain/                 # Tầng 1: Entities, AppError, RBAC Permission Matrix (không phụ thuộc framework/DB)
+├── application/use-cases/  # Tầng 2: Use Cases nghiệp vụ (nhận Repository & Gateway qua Dependency Injection)
+├── infrastructure/         # Tầng 3: SQLite & Supabase Repositories, Scrypt/HMAC Security, Storage, VietQR & VNPay Gateways
+├── interfaces/http/        # Tầng 4: Express Controllers, Routes, Middlewares (authenticate & requirePermission), Error Handler
+├── container.js            # Composition Root (lắp ráp DI Container)
+├── app.js                  # Export Express app (dùng chung cho local & Vercel api/index.js)
+└── index.js                # Standalone HTTP server
+```
 
-### 2. Trang Quản trị (`/admin`)
-- Truy cập: **`http://localhost:5173/admin`** (hoặc bấm **Trang quản trị (Admin)** ở góc dưới Footer)
-- Tài khoản mặc định:
-  - **Email**: `admin@xraptor.vn`
-  - **Mật khẩu**: `admin123`
-- Chức năng: Tổng quan KPI & biểu đồ kho hàng, CRUD Sản phẩm (kèm upload ảnh), Quản lý Đơn hàng & đổi trạng thái, Quản lý Liên hệ, Quản lý Blog, Xuất CSV danh sách email đăng ký, Đổi mật khẩu quản trị.
+## Phân quyền RBAC (4 vai trò Admin Portal)
 
-## Kết nối Supabase (PostgreSQL + Storage)
-1. Tạo project miễn phí tại [supabase.com](https://supabase.com).
-2. Vào **SQL Editor** → dán toàn bộ nội dung file `supabase/schema.sql` → bấm **Run**.
-3. Vào **Project Settings → API**, lấy `Project URL` và `service_role` secret key, rồi điền vào:
-   - **Local**: copy `.env.example` thành `.env` và điền `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
-   - **Vercel**: vào **Project Settings → Environment Variables** và thêm `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_JWT_SECRET`.
-4. Dữ liệu mẫu (28 sản phẩm, 3 blog, đơn hàng mẫu, tài khoản Admin) sẽ tự động được khởi tạo ở lần kết nối đầu tiên.
+| Vai trò | Tài khoản mặc định | Quyền chính |
+|---|---|---|
+| `superadmin` | `admin@xraptor.vn` / `admin123` | Toàn quyền hệ thống, quản lý nhân sự & phân quyền, xóa đơn hàng, hoàn tiền |
+| `manager` | `manager@xraptor.vn` / `manager123` | Quản lý sản phẩm, đơn hàng, xác nhận & hoàn tiền thanh toán, liên hệ, blog, subscribers |
+| `staff` | `staff@xraptor.vn` / `staff123` | Xem tổng quan/sản phẩm, xử lý đơn hàng, xác nhận thanh toán COD/VietQR, xử lý liên hệ |
+| `editor` | `editor@xraptor.vn` / `editor123` | Xem tổng quan/sản phẩm, toàn quyền quản lý Blog - Tin tức, upload ảnh, xem subscribers |
 
-## Cài đặt & Chạy dự án
+> Quyền hạn được kiểm tra **2 lớp**: tầng HTTP Middleware (`requirePermission`) và tầng Application Use Case (`assertPermission`), đồng thời đọc trạng thái tài khoản trực tiếp từ DB nên việc khóa tài khoản hoặc đổi vai trò có hiệu lực ngay lập tức.
+
+## Hệ thống Thanh toán (Payment)
+1. **COD**: Thanh toán khi nhận hàng; tự động đánh dấu `Đã thanh toán` khi đơn chuyển sang `Hoàn thành` hoặc được xác nhận thu tiền.
+2. **Chuyển khoản VietQR**: Tự động sinh mã QR ngân hàng kèm số tiền & nội dung chuyển khoản `XRAPTOR <Mã đơn>`.
+3. **Cổng thanh toán VNPay**:
+   - Khi điền `VNPAY_TMN_CODE` và `VNPAY_HASH_SECRET` trong `.env`: tạo URL thanh toán VNPay v2.1.0 ký **HMAC-SHA512**, kèm Return URL (`/api/payments/vnpay/return`) và IPN webhook (`/api/payments/vnpay/ipn`).
+   - Khi chưa điền key VNPay: tự động dùng **VNPay Sandbox Simulator** ký **HMAC-SHA256** ngay trong giỏ hàng để kiểm thử đầy đủ luồng thanh toán thành công / thất bại / thử lại / hoàn tiền.
+
+## Cài đặt, Chạy & Kiểm thử
 
 ```bash
 # Cài đặt thư viện
 npm install
 
-# Chạy song song cả Backend API (port 4000) và Frontend Vite (port 5173)
+# Chạy song song Backend API (port 4000) và Frontend Vite (port 5173)
 npm run dev
+
+# Chạy bộ kiểm thử tự động Clean Architecture, RBAC & Payment
+npm test
 
 # Đóng gói production
 npm run build
 ```
+
+## Kết nối Supabase (PostgreSQL + Storage)
+1. Tạo project miễn phí tại [supabase.com](https://supabase.com).
+2. Vào **SQL Editor** → dán toàn bộ nội dung file `supabase/schema.sql` → bấm **Run**.
+3. Copy `.env.example` thành `.env` và điền `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Bỏ trống để chạy Local SQLite (`server/data/xraptor.db`).

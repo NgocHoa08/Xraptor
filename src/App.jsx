@@ -62,6 +62,33 @@ export default function App() {
     loadStoreData();
   }, [loadStoreData]);
 
+  // Handle VNPay return redirect query params (?payment_result=success&order=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('payment_result');
+    const orderCode = params.get('order');
+    if (result) {
+      if (result === 'success') {
+        showToast(
+          `Thanh toán VNPay thành công${orderCode ? ` cho đơn ${orderCode}` : ''}!`
+        );
+      } else {
+        showToast(
+          `Thanh toán VNPay chưa hoàn tất${orderCode ? ` (đơn ${orderCode})` : ''}.`
+        );
+      }
+      params.delete('payment_result');
+      params.delete('order');
+      params.delete('code');
+      const nextSearch = params.toString();
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}${nextSearch ? '?' + nextSearch : ''}`
+      );
+    }
+  }, [showToast]);
+
   // Support browser back/forward for /admin vs storefront
   useEffect(() => {
     const onPop = () => {

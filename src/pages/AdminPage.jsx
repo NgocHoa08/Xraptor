@@ -22,9 +22,13 @@ import {
   Lock,
   Eye,
   Menu,
+  CreditCard,
+  Shield,
 } from 'lucide-react';
 import { BRAND, formatVND } from '../data/siteData';
 import { api, getAdminToken, setAdminToken } from '../services/api';
+import PaymentsTab from '../components/admin/PaymentsTab';
+import UsersRbacTab from '../components/admin/UsersRbacTab';
 
 const ORDER_STATUSES = ['Chờ xác nhận', 'Đang xử lý', 'Đang giao', 'Hoàn thành', 'Đã hủy'];
 const PRODUCT_CATEGORIES = [
@@ -42,6 +46,21 @@ const STATUS_BADGE = {
   'Đã hủy': 'bg-rose-100 text-rose-800 border-rose-200',
   'Chưa xử lý': 'bg-amber-100 text-amber-800 border-amber-200',
   'Đã xử lý': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+};
+
+const PAYMENT_BADGE = {
+  'Đã thanh toán': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Đang chờ thanh toán': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Chưa thanh toán': 'bg-gray-100 text-gray-600 border-gray-200',
+  'Thất bại': 'bg-rose-50 text-rose-700 border-rose-200',
+  'Đã hoàn tiền': 'bg-purple-50 text-purple-700 border-purple-200',
+};
+
+const ROLE_BADGE = {
+  superadmin: 'bg-rose-100 text-rose-800 border-rose-200',
+  manager: 'bg-sky-100 text-sky-800 border-sky-200',
+  staff: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  editor: 'bg-amber-100 text-amber-800 border-amber-200',
 };
 
 const EMPTY_PRODUCT = {
@@ -82,9 +101,14 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
   const [dashboard, setDashboard] = useState(null);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [paymentSummary, setPaymentSummary] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [blogs, setBlogs] = useState([]);
   const [subscribers, setSubscribers] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [permissionCatalog, setPermissionCatalog] = useState([]);
 
   // Filters
   const [prodSearch, setProdSearch] = useState('');
@@ -106,6 +130,11 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
     setTimeout(() => setNotice(null), 3200);
   }, []);
 
+  const can = useCallback(
+    (perm) => Boolean(admin?.permissions?.includes(perm)),
+    [admin]
+  );
+
   // Verify session on mount
   useEffect(() => {
     const token = getAdminToken();
@@ -115,34 +144,53 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
     }
     api
       .me()
-      .then((res) => setAdmin(res.admin))
+      .then((res) => {
+        setAdmin(res.admin);
+        if (res.roles) setRoles(res.roles);
+        if (res.permissionCatalog) setPermissionCatalog(res.permissionCatalog);
+      })
       .catch(() => setAdminToken(''))
       .finally(() => setCheckingAuth(false));
   }, []);
 
   const fetchAll = useCallback(async () => {
+    if (!admin) return;
     setLoading(true);
     try {
-      const [dashRes, prodRes, ordRes, conRes, blogRes, subRes] = await Promise.all([
-        api.getDashboard(),
-        api.getProducts(),
-        api.getOrders(),
-        api.getContacts(),
-        api.getBlogs(),
-        api.getSubscribers(),
-      ]);
-      setDashboard(dashRes);
+      const perms = admin.permissions || [];
+      const has = (p) => perms.includes(p);
+
+      const [dashRes, prodRes, ordRes, payRes, conRes, blogRes, subRes, usrRes] =
+        await Promise.all([
+          has('dashboard:read') ? api.getDashboard() : Promise.resolve(null),
+          has('products:read') ? api.getProducts() : Promise.resolve({ products: [] }),
+          has('orders:read') ? api.getOrders() : Promise.resolve({ orders: [] }),
+          has('payments:read') ? api.getPayments() : Promise.resolve({ payments: [], summary: null }),
+          has('contacts:read') ? api.getContacts() : Promise.resolve({ contacts: [] }),
+          has('blogs:read') ? api.getBlogs() : Promise.resolve({ blogs: [] }),
+          has('subscribers:read') ? api.getSubscribers() : Promise.resolve({ subscribers: [] }),
+          has('users:read') ? api.getUsers() : Promise.resolve(null),
+        ]);
+
+      if (dashRes) setDashboard(dashRes);
       setProducts(prodRes.products || []);
       setOrders(ordRes.orders || []);
+      setPayments(payRes.payments || []);
+      setPaymentSummary(payRes.summary || null);
       setContacts(conRes.contacts || []);
       setBlogs(blogRes.blogs || []);
       setSubscribers(subRes.subscribers || []);
+      if (usrRes) {
+        setUsers(usrRes.users || []);
+        if (usrRes.roles) setRoles(usrRes.roles);
+        if (usrRes.permissionCatalog) setPermissionCatalog(usrRes.permissionCatalog);
+      }
     } catch (err) {
       showNotice(err.message, 'error');
     } finally {
       setLoading(false);
     }
-  }, [showNotice]);
+  }, [admin, showNotice]);
 
   useEffect(() => {
     if (admin) fetchAll();
@@ -156,6 +204,7 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
       const res = await api.login(loginForm.email, loginForm.password);
       setAdminToken(res.token);
       setAdmin(res.admin);
+      setTab('dashboard');
     } catch (err) {
       setLoginError(err.message || 'Đăng nhập thất bại.');
     } finally {
@@ -166,7 +215,68 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
   const handleLogout = () => {
     setAdminToken('');
     setAdmin(null);
+    setUsers([]);
+    setPayments([]);
+    setOrders([]);
     setLoginForm({ email: 'admin@xraptor.vn', password: '' });
+  };
+
+  // Payment actions
+  const handleConfirmPayment = async (p) => {
+    if (!window.confirm(`Xác nhận đã thu ${formatVND(p.amount)} cho đơn ${p.orderCode}?`)) return;
+    try {
+      await api.confirmManualPayment(p.id);
+      showNotice(`Đã xác nhận thanh toán đơn ${p.orderCode}!`);
+      await fetchAll();
+    } catch (err) {
+      showNotice(err.message, 'error');
+    }
+  };
+
+  const handleRefundPayment = async (p) => {
+    const reason = window.prompt(`Nhập lý do hoàn tiền cho giao dịch ${p.transactionCode}:`, 'Hoàn tiền theo yêu cầu khách hàng');
+    if (reason === null) return;
+    try {
+      await api.refundPayment(p.id, { reason });
+      showNotice(`Đã hoàn tiền giao dịch ${p.transactionCode}.`);
+      await fetchAll();
+    } catch (err) {
+      showNotice(err.message, 'error');
+    }
+  };
+
+  // RBAC User CRUD
+  const handleCreateUser = async (payload) => {
+    try {
+      await api.createUser(payload);
+      showNotice('Đã tạo tài khoản nhân sự mới!');
+      await fetchAll();
+    } catch (err) {
+      showNotice(err.message, 'error');
+      throw err;
+    }
+  };
+
+  const handleUpdateUser = async (id, patch) => {
+    try {
+      await api.updateUser(id, patch);
+      showNotice('Đã cập nhật phân quyền nhân sự!');
+      await fetchAll();
+    } catch (err) {
+      showNotice(err.message, 'error');
+      throw err;
+    }
+  };
+
+  const handleDeleteUser = async (u) => {
+    if (!window.confirm(`Xóa vĩnh viễn tài khoản "${u.name}" (${u.email})?`)) return;
+    try {
+      await api.deleteUser(u.id);
+      showNotice('Đã xóa tài khoản nhân sự.');
+      await fetchAll();
+    } catch (err) {
+      showNotice(err.message, 'error');
+    }
   };
 
   // Upload image helper
@@ -419,15 +529,24 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
     return matchSt && matchQ;
   });
 
-  const navItems = [
-    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
-    { id: 'products', label: 'Sản phẩm', icon: Package, badge: products.length },
+  const allNavItems = [
+    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, perm: 'dashboard:read' },
+    { id: 'products', label: 'Sản phẩm', icon: Package, badge: products.length, perm: 'products:read' },
     {
       id: 'orders',
       label: 'Đơn hàng',
       icon: ShoppingCart,
       badge: dashboard?.kpis?.pendingOrders || 0,
       highlight: (dashboard?.kpis?.pendingOrders || 0) > 0,
+      perm: 'orders:read',
+    },
+    {
+      id: 'payments',
+      label: 'Thanh toán',
+      icon: CreditCard,
+      badge: paymentSummary?.pendingCount || 0,
+      highlight: (paymentSummary?.pendingCount || 0) > 0,
+      perm: 'payments:read',
     },
     {
       id: 'contacts',
@@ -435,11 +554,15 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
       icon: MessageSquare,
       badge: dashboard?.kpis?.unreadContacts || 0,
       highlight: (dashboard?.kpis?.unreadContacts || 0) > 0,
+      perm: 'contacts:read',
     },
-    { id: 'blogs', label: 'Blog - Tin tức', icon: FileText, badge: blogs.length },
-    { id: 'subscribers', label: 'Khách đăng ký', icon: Mail, badge: subscribers.length },
-    { id: 'settings', label: 'Cài đặt', icon: Settings },
+    { id: 'blogs', label: 'Blog - Tin tức', icon: FileText, badge: blogs.length, perm: 'blogs:read' },
+    { id: 'subscribers', label: 'Khách đăng ký', icon: Mail, badge: subscribers.length, perm: 'subscribers:read' },
+    { id: 'users', label: 'Nhân sự & Phân quyền', icon: Shield, badge: users.length, perm: 'users:read' },
+    { id: 'settings', label: 'Cài đặt', icon: Settings, perm: null },
   ];
+
+  const navItems = allNavItems.filter((item) => !item.perm || can(item.perm));
 
   return (
     <div className="min-h-screen bg-[#f4f7fb] flex text-[#27272a]">
@@ -512,9 +635,12 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
         </nav>
 
         <div className="p-4 border-t border-white/10 space-y-2">
-          <div className="px-2 py-1 text-xs text-white/75 truncate">
+          <div className="px-2 py-1 text-xs text-white/75 truncate space-y-1">
             <p className="font-bold text-white truncate">{admin.name}</p>
             <p className="truncate">{admin.email}</p>
+            <span className="inline-block px-2 py-0.5 rounded bg-[#f5dc4a] text-black text-[10px] font-bold uppercase">
+              {admin.roleLabel || admin.role}
+            </span>
           </div>
           <button
             onClick={onExitAdmin}
@@ -547,6 +673,14 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
             <h1 className="font-heading font-bold text-lg sm:text-xl text-[#134377] uppercase">
               {navItems.find((n) => n.id === tab)?.label}
             </h1>
+            <span
+              className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                ROLE_BADGE[admin.role] || 'bg-gray-100 text-gray-700'
+              }`}
+            >
+              <Shield className="w-3 h-3" />
+              {admin.roleLabel || admin.role}
+            </span>
             {dashboard?.database && (
               <span
                 className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${dashboard.database === 'supabase'
@@ -592,7 +726,7 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                     {formatVND(dashboard.kpis.totalRevenue)}
                   </p>
                   <p className="text-xs text-emerald-600 mt-1.5 font-medium">
-                    {dashboard.kpis.completedOrders} đơn đã hoàn thành
+                    Đã thu: {formatVND(dashboard.kpis.paidRevenue || 0)} ({dashboard.kpis.paidOrders || 0} đơn)
                   </p>
                 </div>
                 <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-xs">
@@ -729,7 +863,16 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                             <p className="font-medium">{o.customer_name}</p>
                             <p className="text-xs text-gray-400">{o.phone}</p>
                           </td>
-                          <td className="px-5 py-3 text-xs">{o.payment_method}</td>
+                          <td className="px-5 py-3 text-xs">
+                            <p className="font-semibold text-[#134377]">{o.payment_method}</p>
+                            <span
+                              className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                PAYMENT_BADGE[o.payment_status] || 'bg-gray-100'
+                              }`}
+                            >
+                              {o.payment_status || 'Chưa thanh toán'}
+                            </span>
+                          </td>
                           <td className="px-5 py-3 font-bold text-[#dd3333]">
                             {formatVND(o.total_amount)}
                           </td>
@@ -778,13 +921,15 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                     ))}
                   </select>
                 </div>
-                <button
-                  onClick={() => setProdModal({ mode: 'create', data: { ...EMPTY_PRODUCT } })}
-                  className="h-10 px-4 rounded-lg bg-[#0972b6] hover:bg-[#134377] text-white text-sm font-bold flex items-center gap-2 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Thêm sản phẩm</span>
-                </button>
+                {can('products:write') && (
+                  <button
+                    onClick={() => setProdModal({ mode: 'create', data: { ...EMPTY_PRODUCT } })}
+                    className="h-10 px-4 rounded-lg bg-[#0972b6] hover:bg-[#134377] text-white text-sm font-bold flex items-center gap-2 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Thêm sản phẩm</span>
+                  </button>
+                )}
               </div>
 
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -846,20 +991,27 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="inline-flex items-center gap-1.5">
-                              <button
-                                onClick={() => setProdModal({ mode: 'edit', data: { ...p } })}
-                                className="p-2 rounded-lg text-[#0972b6] hover:bg-[#edf8ff] cursor-pointer"
-                                title="Sửa"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteProduct(p)}
-                                className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
-                                title="Xóa"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {can('products:write') && (
+                                <button
+                                  onClick={() => setProdModal({ mode: 'edit', data: { ...p } })}
+                                  className="p-2 rounded-lg text-[#0972b6] hover:bg-[#edf8ff] cursor-pointer"
+                                  title="Sửa"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                              )}
+                              {can('products:delete') && (
+                                <button
+                                  onClick={() => handleDeleteProduct(p)}
+                                  className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                  title="Xóa"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                              {!can('products:write') && !can('products:delete') && (
+                                <span className="text-xs text-gray-400">Chỉ xem</span>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -908,7 +1060,7 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                       <tr>
                         <th className="px-4 py-3">Mã đơn</th>
                         <th className="px-4 py-3">Khách hàng</th>
-                        <th className="px-4 py-3">Sản phẩm</th>
+                        <th className="px-4 py-3">Sản phẩm &amp; Thanh toán</th>
                         <th className="px-4 py-3">Tổng tiền</th>
                         <th className="px-4 py-3">Trạng thái</th>
                         <th className="px-4 py-3 text-right">Chi tiết</th>
@@ -922,26 +1074,44 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                             <p className="font-semibold">{o.customer_name}</p>
                             <p className="text-xs text-gray-500">{o.phone}</p>
                           </td>
-                          <td className="px-4 py-3 text-xs text-gray-600">
-                            {(o.items || []).reduce((s, i) => s + i.qty, 0)} sản phẩm (
-                            {o.payment_method})
+                          <td className="px-4 py-3 text-xs text-gray-600 space-y-1">
+                            <p>
+                              {(o.items || []).reduce((s, i) => s + i.qty, 0)} sản phẩm (
+                              <strong>{o.payment_method}</strong>)
+                            </p>
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                PAYMENT_BADGE[o.payment_status] || 'bg-gray-100'
+                              }`}
+                            >
+                              {o.payment_status || 'Chưa thanh toán'}
+                            </span>
                           </td>
                           <td className="px-4 py-3 font-bold text-[#dd3333]">
                             {formatVND(o.total_amount)}
                           </td>
                           <td className="px-4 py-3">
-                            <select
-                              value={o.status}
-                              onChange={(e) => handleOrderStatus(o.id, e.target.value)}
-                              className={`text-xs font-bold px-2.5 py-1 rounded-full border outline-none cursor-pointer ${STATUS_BADGE[o.status] || 'bg-gray-100'
-                                }`}
-                            >
-                              {ORDER_STATUSES.map((st) => (
-                                <option key={st} value={st} className="bg-white text-black">
-                                  {st}
-                                </option>
-                              ))}
-                            </select>
+                            {can('orders:update') ? (
+                              <select
+                                value={o.status}
+                                onChange={(e) => handleOrderStatus(o.id, e.target.value)}
+                                className={`text-xs font-bold px-2.5 py-1 rounded-full border outline-none cursor-pointer ${STATUS_BADGE[o.status] || 'bg-gray-100'
+                                  }`}
+                              >
+                                {ORDER_STATUSES.map((st) => (
+                                  <option key={st} value={st} className="bg-white text-black">
+                                    {st}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span
+                                className={`text-xs font-bold px-2.5 py-1 rounded-full border ${STATUS_BADGE[o.status] || 'bg-gray-100'
+                                  }`}
+                              >
+                                {o.status}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <button
@@ -951,13 +1121,15 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleDeleteOrder(o)}
-                              className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
-                              title="Xóa"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {can('orders:delete') && (
+                              <button
+                                onClick={() => handleDeleteOrder(o)}
+                                className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                title="Xóa"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -966,6 +1138,18 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ======================== TAB: PAYMENTS ======================== */}
+          {tab === 'payments' && can('payments:read') && (
+            <PaymentsTab
+              payments={payments}
+              summary={paymentSummary}
+              canVerify={can('payments:verify')}
+              canRefund={can('payments:refund')}
+              onConfirmPayment={handleConfirmPayment}
+              onRefundPayment={handleRefundPayment}
+            />
           )}
 
           {/* ======================== TAB: CONTACTS ======================== */}
@@ -994,19 +1178,23 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                     <p className="text-sm text-gray-800 pt-1 leading-relaxed">{c.message}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => handleToggleContact(c)}
-                      className="px-3 h-9 rounded-lg border border-[#0972b6] text-[#0972b6] hover:bg-[#edf8ff] text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>{c.status === 'Đã xử lý' ? 'Đánh dấu chưa xử lý' : 'Đã xử lý'}</span>
-                    </button>
-                    <button
-                      onClick={() => handleDeleteContact(c)}
-                      className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {can('contacts:update') && (
+                      <button
+                        onClick={() => handleToggleContact(c)}
+                        className="px-3 h-9 rounded-lg border border-[#0972b6] text-[#0972b6] hover:bg-[#edf8ff] text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>{c.status === 'Đã xử lý' ? 'Đánh dấu chưa xử lý' : 'Đã xử lý'}</span>
+                      </button>
+                    )}
+                    {can('contacts:delete') && (
+                      <button
+                        onClick={() => handleDeleteContact(c)}
+                        className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1021,15 +1209,17 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
           {/* ======================== TAB: BLOGS ======================== */}
           {tab === 'blogs' && (
             <div className="space-y-4">
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setBlogModal({ mode: 'create', data: { ...EMPTY_BLOG } })}
-                  className="h-10 px-4 rounded-lg bg-[#0972b6] hover:bg-[#134377] text-white text-sm font-bold flex items-center gap-2 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Đăng bài viết</span>
-                </button>
-              </div>
+              {can('blogs:write') && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setBlogModal({ mode: 'create', data: { ...EMPTY_BLOG } })}
+                    className="h-10 px-4 rounded-lg bg-[#0972b6] hover:bg-[#134377] text-white text-sm font-bold flex items-center gap-2 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Đăng bài viết</span>
+                  </button>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {blogs.map((b) => (
                   <div
@@ -1051,18 +1241,22 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                         )}
                       </div>
                       <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-                        <button
-                          onClick={() => setBlogModal({ mode: 'edit', data: { ...b } })}
-                          className="px-3 py-1.5 rounded bg-[#edf8ff] text-[#0972b6] text-xs font-semibold cursor-pointer"
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          onClick={() => handleDeleteBlog(b)}
-                          className="px-3 py-1.5 rounded bg-rose-50 text-rose-600 text-xs font-semibold cursor-pointer"
-                        >
-                          Xóa
-                        </button>
+                        {can('blogs:write') && (
+                          <button
+                            onClick={() => setBlogModal({ mode: 'edit', data: { ...b } })}
+                            className="px-3 py-1.5 rounded bg-[#edf8ff] text-[#0972b6] text-xs font-semibold cursor-pointer"
+                          >
+                            Sửa
+                          </button>
+                        )}
+                        {can('blogs:delete') && (
+                          <button
+                            onClick={() => handleDeleteBlog(b)}
+                            className="px-3 py-1.5 rounded bg-rose-50 text-rose-600 text-xs font-semibold cursor-pointer"
+                          >
+                            Xóa
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1103,15 +1297,17 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                         <td className="px-5 py-3 font-medium text-[#134377]">{s.email}</td>
                         <td className="px-5 py-3 text-xs text-gray-500">{s.created_at}</td>
                         <td className="px-5 py-3 text-right">
-                          <button
-                            onClick={async () => {
-                              await api.deleteSubscriber(s.id);
-                              fetchAll();
-                            }}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {can('subscribers:delete') && (
+                            <button
+                              onClick={async () => {
+                                await api.deleteSubscriber(s.id);
+                                fetchAll();
+                              }}
+                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1119,6 +1315,21 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
                 </table>
               </div>
             </div>
+          )}
+
+          {/* ======================== TAB: USERS & RBAC ======================== */}
+          {tab === 'users' && can('users:read') && (
+            <UsersRbacTab
+              currentUser={admin}
+              users={users}
+              roles={roles}
+              permissionCatalog={permissionCatalog}
+              canWrite={can('users:write')}
+              canDelete={can('users:delete')}
+              onCreateUser={handleCreateUser}
+              onUpdateUser={handleUpdateUser}
+              onDeleteUser={handleDeleteUser}
+            />
           )}
 
           {/* ======================== TAB: SETTINGS ======================== */}
@@ -1643,26 +1854,55 @@ export default function AdminPage({ onExitAdmin, onDataMutated }) {
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                <span className="font-bold">Tổng thanh toán ({orderDetail.payment_method}):</span>
+                <div>
+                  <span className="font-bold">Tổng thanh toán ({orderDetail.payment_method}):</span>
+                  <span
+                    className={`ml-2 px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                      PAYMENT_BADGE[orderDetail.payment_status] || 'bg-gray-100'
+                    }`}
+                  >
+                    {orderDetail.payment_status || 'Chưa thanh toán'}
+                  </span>
+                </div>
                 <span className="text-lg font-bold text-[#dd3333]">
                   {formatVND(orderDetail.total_amount)}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between gap-3 pt-3 border-t">
-                <span className="text-xs font-semibold text-gray-600">Cập nhật trạng thái:</span>
-                <select
-                  value={orderDetail.status}
-                  onChange={(e) => handleOrderStatus(orderDetail.id, e.target.value)}
-                  className="h-9 px-3 rounded-lg border border-gray-300 text-xs font-bold cursor-pointer"
-                >
-                  {ORDER_STATUSES.map((st) => (
-                    <option key={st} value={st}>
-                      {st}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {can('payments:verify') &&
+                orderDetail.payment &&
+                orderDetail.payment_status !== 'Đã thanh toán' &&
+                orderDetail.payment_status !== 'Đã hoàn tiền' && (
+                  <div className="pt-2">
+                    <button
+                      onClick={async () => {
+                        await handleConfirmPayment(orderDetail.payment);
+                        setOrderDetail(null);
+                      }}
+                      className="w-full h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Xác nhận đã nhận thanh toán ({formatVND(orderDetail.total_amount)})</span>
+                    </button>
+                  </div>
+                )}
+
+              {can('orders:update') && (
+                <div className="flex items-center justify-between gap-3 pt-3 border-t">
+                  <span className="text-xs font-semibold text-gray-600">Cập nhật trạng thái:</span>
+                  <select
+                    value={orderDetail.status}
+                    onChange={(e) => handleOrderStatus(orderDetail.id, e.target.value)}
+                    className="h-9 px-3 rounded-lg border border-gray-300 text-xs font-bold cursor-pointer"
+                  >
+                    {ORDER_STATUSES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -3,11 +3,10 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import express from 'express';
-import app from './app.js';
-import store from './store.js';
+import app, { container } from './app.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 4000;
+const PORT = container.config.port;
 
 // Serve built frontend in standalone production mode if dist exists
 const distDir = path.resolve(__dirname, '../dist');
@@ -18,6 +17,10 @@ if (process.env.NODE_ENV === 'production' && fs.existsSync(distDir)) {
   });
 }
 
+const gatewayMode = container.services.paymentGatewayFactory.getCapabilities().vnpayMode;
+
 app.listen(PORT, () => {
-  console.log(`🚀 Xraptor Backend API running at http://localhost:${PORT} [DB: ${store.mode.toUpperCase()}]`);
+  console.log(
+    `🚀 Xraptor API (Clean Architecture) running at http://localhost:${PORT} [DB: ${container.config.dbMode.toUpperCase()} | Payment: ${gatewayMode}]`
+  );
 });

@@ -22,7 +22,10 @@ async function request(url, options = {}) {
   const res = await fetch(url, { ...options, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.error || `Lỗi máy chủ (${res.status})`);
+    const err = new Error(data.error || `Lỗi máy chủ (${res.status})`);
+    err.status = res.status;
+    err.code = data.code;
+    throw err;
   }
   return data;
 }
@@ -45,6 +48,15 @@ export const api = {
   subscribe: (email) =>
     request('/api/subscribers', { method: 'POST', body: JSON.stringify({ email }) }),
 
+  // Public payments
+  getPaymentMethods: () => request('/api/payments/methods'),
+  createPaymentIntent: (payload) =>
+    request('/api/payments/create', { method: 'POST', body: JSON.stringify(payload) }),
+  getOrderPayment: (orderCode) =>
+    request(`/api/payments/order/${encodeURIComponent(orderCode)}`),
+  confirmSandboxPayment: (payload) =>
+    request('/api/payments/sandbox/confirm', { method: 'POST', body: JSON.stringify(payload) }),
+
   // Admin auth
   login: (email, password) =>
     request('/api/auth/login', {
@@ -56,6 +68,33 @@ export const api = {
     request('/api/auth/change-password', {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+
+  // Admin RBAC & Users
+  getUsers: () => request('/api/users'),
+  getRoles: () => request('/api/users/roles'),
+  createUser: (payload) =>
+    request('/api/users', { method: 'POST', body: JSON.stringify(payload) }),
+  updateUser: (id, payload) =>
+    request(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteUser: (id) => request(`/api/users/${id}`, { method: 'DELETE' }),
+
+  // Admin Payments
+  getPayments: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    ).toString();
+    return request(`/api/payments${qs ? '?' + qs : ''}`);
+  },
+  confirmManualPayment: (id, payload = {}) =>
+    request(`/api/payments/${id}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  refundPayment: (id, payload = {}) =>
+    request(`/api/payments/${id}/refund`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
 
   // Admin dashboard & CRUD
