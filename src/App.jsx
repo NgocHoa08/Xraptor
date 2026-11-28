@@ -43,6 +43,11 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [showBackTop, setShowBackTop] = useState(false);
 
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2800);
+  }, []);
+
   const loadStoreData = useCallback(async () => {
     try {
       const [prodRes, blogRes] = await Promise.all([api.getProducts(), api.getBlogs()]);
@@ -112,11 +117,6 @@ export default function App() {
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const showToast = useCallback((msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2800);
   }, []);
 
   const handleNavigate = useCallback((page, opts = {}) => {

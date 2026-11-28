@@ -53,6 +53,15 @@ export class SupabasePaymentRepository {
     return normalizePayment(data);
   }
 
+  _isMissingTableError(error) {
+    const msg = String(error?.message || '').toLowerCase();
+    return (
+      error?.code === '42P01' ||
+      error?.code === 'PGRST205' ||
+      (msg.includes('payments') && (msg.includes('does not exist') || msg.includes('schema cache')))
+    );
+  }
+
   async findLatestByOrderId(orderId) {
     await this.ensureSeeded();
     const { data, error } = await this.supabase
@@ -62,7 +71,10 @@ export class SupabasePaymentRepository {
       .order('id', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (this._isMissingTableError(error)) return null;
+      throw new Error(error.message);
+    }
     return normalizePayment(data);
   }
 
@@ -73,7 +85,10 @@ export class SupabasePaymentRepository {
     if (method && method !== 'Tất cả') q = q.eq('method', String(method).toUpperCase());
 
     const { data, error } = await q;
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (this._isMissingTableError(error)) return [];
+      throw new Error(error.message);
+    }
 
     let list = (data || []).map(normalizePayment);
     if (search) {
